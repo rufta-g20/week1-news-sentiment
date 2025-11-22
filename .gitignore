@@ -1,0 +1,19 @@
+# virtual env
+venv/
+.venv/
+
+# data and outputs
+data/
+*.csv
+*.db
+
+# python
+__pycache__/
+*.pyc
+
+# jupyter
+.ipynb_checkpoints/
+
+# IDE
+.vscode/*
+!.vscode/settings.json
