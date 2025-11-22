@@ -1,4 +1,4 @@
-﻿beautifulsoup4==4.14.2
+beautifulsoup4==4.14.2
 curl_cffi==0.13.0
 httpx==0.28.1
 ipykernel==7.1.0
