@@ -3,16 +3,15 @@
 This folder contains unit tests for validating the correctness of project modules.
 
 ### ✔️ Purpose of Tests
-- Ensure data processing functions behave correctly
+- Ensure data processing functions and **class methods** behave correctly
 - Catch errors before merging (via CI)
 - Maintain code quality as the project grows
 
 ### 📁 Structure
-- __init__.py — Makes this a Python package
+- `__init__.py` — Makes this a Python package
 - *(Future)* Add test files such as:
-  - test_loading.py
-  - test_cleaning.py
-  - test_sentiment.py
+  - `test_finance_tools.py` — For the new **`StockAnalyzer` class**.
+  - `test_text_processing.py` — For the new **`NewsCorpusProcessor` class**.
 
 ### ▶️ Running Tests Locally
 Activate environment and run:

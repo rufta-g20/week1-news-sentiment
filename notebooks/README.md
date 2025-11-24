@@ -6,19 +6,21 @@ This folder contains all exploratory and experimental Jupyter Notebooks for Week
 Notebooks are used for:
 - Interactive experimentation
 - Exploratory data analysis (EDA)
-- Prototyping data-cleaning or modeling logic
+- **Calling and demonstrating the class methods** from the `scripts/` package.
 - Visualizing intermediate results
 
 ### 📁 Contents
-- week1_experiment.ipynb *(example)* — Prototyping and analysis notebook(s)
+- `task2_text_eda.ipynb` — Exploration of news headlines, text cleaning, and LDA topic modeling.
+- `task2_finance.ipynb` — Financial data loading, calculating returns, and adding TA-Lib indicators.
 
 ### ⚠️ Guidelines
 - Keep notebooks clean and well-commented.
 - Avoid committing large outputs; clear cell outputs before committing.
-- Notebooks should NOT contain production logic — move reusable code to src/ or scripts/.
+- **Notebooks must NOT contain core logic** — all reusable functions and business logic must be imported from the **`scripts`** package (e.g., `StockAnalyzer`).
 
 ### 🔄 Reproducibility
 Before running a notebook, ensure your virtual environment is active:
+
 ```bash
 .\venv\Scripts\activate  # Windows
 source venv/bin/activate # Linux/Mac

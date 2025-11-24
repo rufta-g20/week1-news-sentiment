@@ -23,7 +23,9 @@ This repository contains all required setup, with further implementation to be a
 - **VS Code**
 - **Git & GitHub**
 - **GitHub Actions (CI)**
-- **Pandas, NumPy, TextBlob, NLTK** (more to be added)
+- **Pandas, NumPy, TextBlob, NLTK, Gensim**
+- **TA-Lib** (For technical analysis indicators)
+- **Object-Oriented Design** (Core logic is encapsulated in **classes** within the `scripts/` package.)
 
 ---
 
@@ -37,16 +39,16 @@ week1-news-sentiment/
 │ └── settings.json
 │
 ├── src/ # Main Python package (core logic lives here)
-│ └── __init__.py
+│ └── init.py
 │
-├── scripts/ # Utility scripts for automation or data processing
+├── scripts/ # Core Python Package (Contains StockAnalyzer and NewsCorpusProcessor classes)
 │ └── README.md
 │
 ├── notebooks/ # Jupyter notebooks for EDA and experimentation
 │ └── README.md
 │
 ├── tests/ # Unit tests to validate project functionality
-│ └── __init__.py
+│ └── init.py
 │
 ├── data/ # Raw and processed datasets (ignored in Git)
 │
@@ -62,40 +64,39 @@ Follow these steps to reproduce my environment on any Windows or Linux machine:
 
 ### 1️⃣ Clone the repository
 ```bash
-git clone https://github.com/rufta-g20/week1-news-sentiment.git
+git clone [https://github.com/rufta-g20/week1-news-sentiment.git](https://github.com/rufta-g20/week1-news-sentiment.git)
 cd week1-news-sentiment
 ```
-### 2️⃣ Create & activate the virtual environment
 
+### 2️⃣ Create & activate the virtual environment
 Windows PowerShell
 ```bash
 python -m venv venv
 .\venv\Scripts\activate
 ```
+
 ### 3️⃣ Install dependencies
 ```bash
 pip install --upgrade pip
 pip install -r requirements.txt
 ```
+
 ### 4️⃣ Optional: Start Jupyter
 ```bash
 jupyter notebook
 ```
-## ⚙️ Continuous Integration (CI)
-
-This repository includes a **GitHub Actions workflow (unittests.yml)** that:
-
-- **Sets up Python**
-- **Installs project dependencies**
-- **Runs placeholder tests**
-
-Every push and PR automatically triggers CI.
-
 
 ---
 
+## ⚙️ Continuous Integration (CI)
+This repository includes a GitHub Actions workflow *(unittests.yml)* that:
+ * Sets up Python
+ * Installs project dependencies
+ * Runs placeholder tests
+Every push and PR automatically triggers CI.
+
+---
 
 # 👩‍💻 Author
-
-**Rufta Gaiem Weldegiorgis**
+**Rufta Gaiem Weldegiorgis** 
 **10 Academy — AI Mastery Cohort 8**
