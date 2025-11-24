@@ -23,39 +23,77 @@ This repository contains all required setup, with further implementation to be a
 - **VS Code**
 - **Git & GitHub**
 - **GitHub Actions (CI)**
-- **Pandas, NumPy, TextBlob, NLTK, Gensim**
+- **Pandas, NumPy, TextBlob, NLTK, Gensim, yfinance**
 - **TA-Lib** (For technical analysis indicators)
 - **Object-Oriented Design** (Core logic is encapsulated in **classes** within the `scripts/` package.)
 
 ---
 
 ## 📁 Repository Structure
-week1-news-sentiment/
-│
-├── .github/workflows/ # CI workflows
-│ └── unittests.yml
-│
-├── .vscode/ # VS Code environment settings
-│ └── settings.json
-│
-├── src/ # Main Python package (core logic lives here)
-│ └── init.py
-│
-├── scripts/ # Core Python Package (Contains StockAnalyzer and NewsCorpusProcessor classes)
-│ └── README.md
-│
-├── notebooks/ # Jupyter notebooks for EDA and experimentation
-│ └── README.md
-│
-├── tests/ # Unit tests to validate project functionality
-│ └── init.py
-│
-├── data/ # Raw and processed datasets (ignored in Git)
-│
-├── README.md # → You are reading this
-├── requirements.txt # Reproducible Python dependencies
-├── .gitignore # Ignore unnecessary files / folders
-└── venv/ # Virtual environment (ignored)
+
+week1-news-sentiment/ 
+ │ ├── .github/workflows/ # CI workflows
+ │   └── unittests.yml
+ |
+ │ ├── .vscode/ # VS Code environment settings 
+ │   └── settings.json 
+ |
+ │ ├── src/ # Main Python package (core logic lives here) 
+ │   └── init.py 
+ |
+ │ ├── scripts/ # Utility scripts for automation or data processing 
+ │   ├── README.md 
+ |   ├── init.py
+ │   ├── finance_tools.py # StockAnalyzer Class 
+ │   └── text_processing.py # NewsCorpusProcessor Class 
+ |
+ │ ├── notebooks/ # Jupyter notebooks for EDA and experimentation 
+ │   ├── README.md 
+ │   ├── task2_finance.ipynb 
+ │   └── task2_text_eda.ipynb 
+ |
+ │ ├── tests/ # Unit tests to validate project functionality 
+ │   ├── init.py 
+ |   ├── README.md
+ │   ├── test_smoke_task2.py # End-to-end smoke test
+ |   ├── test_text_processing.py # Unit tests for text processing
+ │   └── test_finance_tools.py # Unit tests for financial tools 
+ |
+ │ ├── data/ # Raw and processed datasets (ignored in Git) 
+ │ ├── README.md # → You are reading this 
+ | ├── requirements.txt # Reproducible Python dependencies 
+ | ├── .gitignore # Ignore unnecessary files / folders 
+ | └── venv/ # Virtual environment (ignored)
+---
+
+## 🚀 Key Modules Usage Example
+
+​The project's core functionality is encapsulated in the `StockAnalyzer` and `NewsCorpusProcessor` classes, located in the `scripts/` folder.
+
+### 📈 Using the `StockAnalyzer`
+​This example demonstrates loading data and adding technical indicators:
+
+```bash
+from scripts.finance_tools import StockAnalyzer
+import pandas as pd
+
+# 1. Initialize the Analyzer (loads data automatically)
+start_date = '2023-01-01'
+end_date = '2024-01-01'
+analyzer = StockAnalyzer(ticker='MSFT', start=start_date, end=end_date)
+
+print(f"Loaded {analyzer.ticker} data from {start_date} to {end_date}.")
+print(f"Initial rows: {analyzer.df.shape[0]}")
+
+# 2. Add Technical Indicators
+analyzer.add_indicators()
+
+# 3. View the results (last 5 rows with indicators)
+print("\nDataFrame with Indicators (Last 5 rows):")
+print(analyzer.df[['Close', 'SMA_20', 'RSI_14', 'MACD', 'MACDSignal']].tail())
+
+# The result is stored in analyzer.df
+```
 ---
 
 ## 🔧 Environment Setup (Reproducible Steps)
@@ -72,7 +110,12 @@ cd week1-news-sentiment
 Windows PowerShell
 ```bash
 python -m venv venv
-.\venv\Scripts\activate
+.\\venv\\Scripts\\activate
+```
+Linux/Mac
+```bash
+python3 -m venv venv 
+source venv/bin/activate
 ```
 
 ### 3️⃣ Install dependencies
@@ -90,13 +133,15 @@ jupyter notebook
 
 ## ⚙️ Continuous Integration (CI)
 This repository includes a GitHub Actions workflow *(unittests.yml)* that:
- * Sets up Python
- * Installs project dependencies
- * Runs placeholder tests
-Every push and PR automatically triggers CI.
+ * Sets up Python and installs TA-Lib dependencies (required for ta-lib).
+ * Installs all dependencies including pytest.
+ * Automatically runs all unit and smoke tests in the `tests/` folder.
+ 
+ Every push and PR automatically triggers CI.
 
 ---
 
 # 👩‍💻 Author
 **Rufta Gaiem Weldegiorgis** 
+
 **10 Academy — AI Mastery Cohort 8**

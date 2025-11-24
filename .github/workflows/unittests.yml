@@ -2,22 +2,26 @@ name: CI
 
 on:
   push:
-    branches: [ main, task-1 ]
+    branches: [ main, task-1, task-2 ] # Added task-2 branch for feature branch strategy
   pull_request:
     branches: [ main ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [ '3.11' ] # Specify a stable, modern Python version
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Python ${{ matrix.python-version }}
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-        
+
       - name: Install TA-Lib dependencies
         run: |
          sudo apt-get update
@@ -31,6 +35,18 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run tests placeholder
+      # ----------------------------------------------------
+      # New Step 1: Run Flake8 Linter
+      # ----------------------------------------------------
+      - name: Lint with Flake8
         run: |
-          echo "No tests yet — CI verified Python and dependencies."
+          # Stop the build on any style violation
+          flake8 . --count --exit-zero --exclude venv,data,.git,build,.vscode,.github,.ipynb_checkpoints --max-complexity=10 --max-line-length=120 --statistics
+          
+      # ----------------------------------------------------
+      # New Step 2: Run Pytest Unit & Smoke Tests
+      # ----------------------------------------------------
+      - name: Run Pytest (Unit Tests and E2E Smoke Test)
+        # Using -v (verbose) and specifying the tests/ directory
+        run: |
+          pytest -v tests/
