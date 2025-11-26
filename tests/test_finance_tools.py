@@ -2,13 +2,13 @@ import pytest
 import pandas as pd
 import numpy as np
 from unittest.mock import patch
-import sys, os
+import os, sys
 from datetime import date
 
 # Ensure the scripts directory is on the path for importing
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(file), '..', 'scripts')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'scripts')))
 
-from finance_tools import StockAnalyzer
+from scripts.finance_tools import StockAnalyzer
 
 # --- Fixtures / Mock Data ---
 
