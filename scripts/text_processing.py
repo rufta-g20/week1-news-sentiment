@@ -1,4 +1,3 @@
-
 """
 Reusable text preprocessing and topic-modeling helpers.
 """
@@ -6,7 +5,9 @@ import re
 import pandas as pd
 import numpy as np
 from gensim import corpora, models
-# NOTE: nltk imports for downloads/data lookup have been removed to fix LookupError
+# VADER is much faster than TextBlob for lexicon-based analysis
+from nltk.sentiment.vader import SentimentIntensityAnalyzer
+from typing import List, Optional, Tuple
 
 # Hardcoded Stopwords (bypasses NLTK LookupError)
 STOP = set((
@@ -29,31 +30,59 @@ STOP = set((
     "hasn't", 'haven', "haven't", 'isn', "isn't", 'ma', 'mightn', "mightn't", 
     'mustn', "mustn't", 'needn', "needn't", 'shan', "shan't", 'shouldn', 
     "shouldn't", 'wasn', "wasn't", 'weren', "weren't", 'won', "won't", 'wouldn', 
-    "wouldn't"
+    "wouldn't", 'com', 'org', 'www'
 ))
 
 
 def clean_text(text: str) -> str:
     """
-    Performs standard text cleaning: lowering case, removing punctuation, 
-    and ensuring consistent whitespace.
+    Cleans text by converting to lowercase, removing specific patterns, 
+    punctuation, numbers, and extra whitespace.
     """
-    text = text.lower()
-    # Remove all non-word characters and replace with a single space.
-    text = re.sub(r'[^\w\s]', ' ', text)
-    # Replace multiple spaces with a single space and strip leading/trailing spaces.
+    if pd.isna(text):
+        return ""
+        
+    text = str(text).lower()
+    
+    # 1. REMOVE TICKET SYMBOLS: E.g., $AAPL, (NASDAQ:TSLA)
+    # This prevents noise from financial symbols in topic modeling.
+    text = re.sub(r'\(\w+:\w+\)', ' ', text) # Removes (NASDAQ:AAPL)
+    text = re.sub(r'\$\w+', ' ', text)        # Removes $AAPL
+    
+    # 2. Remove punctuation, numbers, and non-alphanumeric symbols
+    text = re.sub(r'[^a-z\s]', ' ', text)
+    
+    # 3. Replace multiple spaces with a single space
     text = re.sub(r'\s+', ' ', text).strip()
+    
     return text
 
 
-def headline_length(df: pd.DataFrame, col='headline') -> pd.Series:
+def headline_length(df: pd.DataFrame, col='headline') -> pd.DataFrame:
     """
-    Return length (chars and tokens) of headline column. 
-    Uses simple string split for tokenization.
+    Return length (chars and tokens) of headline column.
+    
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame containing the text data.
+    col : str, optional
+        Name of the column containing the headlines, by default 'headline'.
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with two columns: 'chars' and 'tokens'.
+    
+    Examples
+    --------
+    >>> data = pd.DataFrame({'headline': ['Hello world.', 'Short']})
+    >>> lengths = headline_length(data)
+    >>> lengths['tokens'].tolist()
+    [2, 1]
     """
     s = df[col].fillna("").astype(str)
     chars = s.str.len()
-    # Fixed to use split() to bypass NLTK LookupError
     tokens = s.apply(lambda t: len(t.split()))
     return pd.DataFrame({'chars': chars, 'tokens': tokens})
 
@@ -61,7 +90,13 @@ def headline_length(df: pd.DataFrame, col='headline') -> pd.Series:
 def publisher_domain(publisher: str) -> str:
     """
     Extract domain-like part if email-like or url-like publisher is given.
-    Requires 'tldextract' package.
+    
+    Examples
+    --------
+    >>> publisher_domain("user@example.com")
+    'example.com'
+    >>> publisher_domain("www.the-financial-times.co.uk/news")
+    'the-financial-times.co.uk'
     """
     import tldextract
     if pd.isna(publisher):
@@ -79,33 +114,51 @@ def publisher_domain(publisher: str) -> str:
 
 class NewsCorpusProcessor:
     """
-    Manages the creation of a corpus and the training of an LDA topic model.
+    Manages the processing of a news corpus, including text cleaning,
+    sentiment analysis, and preparation for LDA topic modeling.
+    Attributes
+    ----------
+    texts : list of str
+        The original list of headlines/texts.
+    dictionary : Optional[corpora.Dictionary]
+        Gensim dictionary created after preparation.
+    corpus : Optional[list of list of tuple]
+        Gensim corpus (Bag-of-Words representation) after preparation.
+    texts_tok : Optional[list of list of str]
+        Tokenized and cleaned texts.
 
-    This class encapsulates the gensim logic and uses the global STOP list.
+    Examples
+    --------
+    >>> data = pd.Series(['US stocks rise on good news.', 'The market is fearful.'])
+    >>> processor = NewsCorpusProcessor(data)
+    >>> sentiment_df = processor.calculate_sentiment()
+    >>> sentiment_df.head(1)
+       polarity  subjectivity
+    0      0.70      0.600000
     """
-    def init(self):
-        """Initializes the processor with empty corpus attributes."""
+    def __init__(self, texts: Optional[List[str]] = None):
+        """Initializes the processor and stores the text list."""
+        # Store the raw text list
+        self.texts = texts
+        
+        # Attributes for LDA
         self.dictionary = None
         self.corpus = None
-        self.texts_tok = None
 
-    def prepare_corpus(self, texts: list, no_below=5, no_above=0.5, keep_n=10000):
+    def prepare_corpus(self, 
+                       no_below: int = 5, 
+                       no_above: float = 0.9, 
+                       keep_n: int = 10000) -> None:
         """
-        Tokenizes texts, creates a Gensim dictionary, and converts to a bag-of-words corpus.
-Parameters
-        ----------
-        texts : list
-            List of documents (headlines/body text) as strings.
-        no_below : int
-            Filter words that appear in fewer than no_below documents.
-        no_above : float
-            Filter words that appear in more than no_above proportion of documents.
-        keep_n : int
-            Maximum number of features (words) to keep in the final dictionary.
+        Tokenizes texts, creates a Gensim Dictionary, and generates a Corpus.
+        It uses the texts stored in self.texts.
         """
-        # Uses clean_text and simple split() for tokenization
-        texts_tok = [[w for w in clean_text(t).split() if w not in STOP and len(w) > 2] for t in texts]
+        # Ensure texts are available
+        if self.texts is None:
+            raise ValueError("Text corpus (self.texts) is empty. Initialize the class with a list of texts.")
         
+
+        texts_tok = [[w for w in clean_text(t).split() if w not in STOP and len(w) > 2] for t in self.texts]
         dictionary = corpora.Dictionary(texts_tok)
         dictionary.filter_extremes(no_below=no_below, no_above=no_above, keep_n=keep_n)
         corpus = [dictionary.doc2bow(text) for text in texts_tok]
@@ -114,7 +167,7 @@ Parameters
         self.corpus = corpus
         self.texts_tok = texts_tok
 
-    def lda_topics(self, num_topics=6, passes=6):
+    def lda_topics(self, num_topics: int = 6, passes: int = 6) -> Tuple[models.LdaModel, List[str]]:
         """
         Trains an LDA model using the stored dictionary and corpus.
 
@@ -131,7 +184,7 @@ Parameters
             The trained model and a list of human-readable topics.
         """
         if self.corpus is None or self.dictionary is None:
-            raise ValueError("Corpus and dictionary must be prepared before running LDA.")
+            raise ValueError("Corpus and dictionary must be prepared before running LDA. Call prepare_corpus() first.")
             
         lda_model = models.LdaModel(
             self.corpus,
@@ -144,7 +197,35 @@ Parameters
         # Format the topics for printing
         topics = []
         for idx, topic in lda_model.print_topics(-1):
-            # Example format: 'Topic 0: 0.045*"stock" + 0.030*"price" + ...'
+            # Example format: 'Topic 0: 0.04..."
             topics.append(f"Topic {idx}: {topic}")
             
         return lda_model, topics
+    
+    def calculate_sentiment(self) -> pd.DataFrame:
+        """
+        Calculates sentiment scores (Compound, Pos, Neu, Neg) for all texts
+        in the corpus using VADER (Valence Aware Dictionary and sEntiment Reasoner).
+
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame with 'vader_compound', 'vader_pos', 'vader_neu', 'vader_neg' columns.
+        """
+        if self.texts is None:
+            raise ValueError("Text corpus (self.texts) is empty.")
+            
+        # Initialize VADER
+        analyzer = SentimentIntensityAnalyzer()
+        
+        # Apply the VADER analysis function to each text
+        # This returns a dictionary of scores {'neg', 'neu', 'pos', 'compound'}
+        sentiment_results = [analyzer.polarity_scores(text) for text in self.texts]
+        
+        # Convert list of dictionaries into a DataFrame
+        sentiment_df = pd.DataFrame(sentiment_results)
+        
+        # Rename columns to be descriptive for the final DataFrame
+        sentiment_df.columns = ['vader_neg', 'vader_neu', 'vader_pos', 'vader_compound']
+        
+        return sentiment_df

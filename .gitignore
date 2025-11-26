@@ -10,10 +10,13 @@ data/
 # python
 __pycache__/
 *.pyc
-
+*.pyo
+*.pyd
+*.egg-info/
 # jupyter
 .ipynb_checkpoints/
 
 # IDE
 .vscode/*
 !.vscode/settings.json
+.idea/

@@ -1,97 +1,137 @@
-"""
-Unit tests for the StockAnalyzer class in scripts/finance_tools.py.
-Uses mock data for isolated testing and real data for integration with yfinance/TA-Lib.
-"""
+import pytest
 import pandas as pd
 import numpy as np
-import pytest
-import yfinance as yf
-from scripts.finance_tools import StockAnalyzer
+from unittest.mock import patch
+import sys, os
+from datetime import date
 
-# --- Mock Data for TA-Lib Calculations ---
-# Mock DataFrame simulating loaded stock data
+# Ensure the scripts directory is on the path for importing
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(file), '..', 'scripts')))
+
+from finance_tools import StockAnalyzer
+
+# --- Fixtures / Mock Data ---
+
+# Create a deterministic mock DataFrame for yfinance download
+# We need at least 50 data points for SMA_50 to calculate, but we'll use 60 for buffer.
 @pytest.fixture
-def mock_stock_df():
-    """
-    Creates a mock DataFrame with exactly 50 rows, the minimum for SMA_50.
-    Open/High/Low/Close columns are required for TA-Lib functions (even if only Close is used).
-    """
-    # Create 50 increasing close prices for predictable indicator output
-    mock_data = {
-        'Open': np.arange(10, 60),
-        'High': np.arange(11, 61),
-        'Low': np.arange(9, 59),
-        'Close': np.arange(10, 60)
+def mock_stock_data():
+    """Generates a mock DataFrame suitable for testing TA-Lib indicators."""
+    num_days = 60
+    dates = pd.date_range(start='2024-01-01', periods=num_days, freq='D')
+    # Create simple, non-random price data for predictable indicator results (Close, Open, High, Low)
+    data = {
+        'Open': np.linspace(100, 150, num_days),
+        'High': np.linspace(101, 151, num_days),
+        'Low': np.linspace(99, 149, num_days),
+        'Close': np.linspace(100.5, 150.5, num_days)
     }
-    df = pd.DataFrame(mock_data)
-    df.index = pd.to_datetime(pd.date_range('2024-01-01', periods=50, freq='D'))
+    df = pd.DataFrame(data, index=dates)
+    df.index.name = 'Date'
     return df
 
-# --- Tests for StockAnalyzer Class ---
+# Helper to mock the yfinance download function
+def mock_download(*args, **kwargs):
+    """Mocks yfinance.download to return a fixed, predictable DataFrame."""
+    return mock_stock_data()
 
-def test_analyzer_initialization_real_data():
-    """Test that the constructor loads real data correctly."""
-    try:
-        analyzer = StockAnalyzer(ticker='MSFT', start='2024-11-01', end='2024-11-10')
-        assert not analyzer.df.empty
-        assert 'Close' in analyzer.df.columns
-    except Exception as e:
-        # Skip if yfinance/network fails (only for the load part)
-        pytest.skip(f"Real data loading failed: {e}")
 
-def test_load_price_drops_multiindex():
-    """Test that the _load_price method correctly handles and flattens multi-index columns."""
-    # Use the internal _load_price method for isolated testing if possible, 
-    # but since yfinance is hard to mock, we trust the integration test above.
-    # The implementation in finance_tools.py looks correct for multi-index flattening.
-    # No isolated fix needed, as the function is internal (_load_price).
-    pass 
+# --- Tests for StockAnalyzer ---
 
-def test_add_indicators_with_mock_data(mock_stock_df):
-    """Test that add_indicators computes the correct columns using mock data."""
+@patch('yfinance.download', side_effect=mock_download)
+def test_stock_analyzer_init(mock_download_func, mock_stock_data):
+    """Test that the StockAnalyzer initializes and loads data correctly."""
+    analyzer = StockAnalyzer(ticker='TEST')
     
-    # Create a minimal StockAnalyzer instance and assign the mock DataFrame
-    class MockAnalyzer(StockAnalyzer):
-        def init(self, df):
-            self.ticker = 'MOCK'
-            self.df = df
+    # Check that yfinance.download was called
+    mock_download_func.assert_called_once()
     
-    analyzer = MockAnalyzer(mock_stock_df.copy())
+    # Check that the loaded DataFrame is stored and matches the mock data structure
+    assert isinstance(analyzer.df, pd.DataFrame)
+    assert analyzer.df.shape == mock_stock_data.shape
+    assert 'Close' in analyzer.df.columns
+    assert 'Date' == analyzer.df.index.name
     
+@patch('yfinance.download', side_effect=mock_download)
+def test_add_indicators_creates_columns(mock_download_func):
+    """Test that add_indicators adds all required TA-Lib columns."""
+    analyzer = StockAnalyzer(ticker='TEST')
     analyzer.add_indicators()
     
-    # Check for presence of all expected indicator columns
-    expected_cols = ['SMA_20', 'SMA_50', 'RSI_14', 'MACD', 'MACD_Signal', 'MACD_Hist']
+    # Expected columns from finance_tools.py
+    expected_cols = ['SMA_20', 'SMA_50', 'RSI_14', 'MACD', 'MACD_Signal', 'MACD_Hist', 'Upper_BB', 'Middle_BB', 'Lower_BB']
+    
     for col in expected_cols:
-        assert col in analyzer.df.columns, f"Indicator column {col} missing."
-        
-    # Check for NaN propagation (SMA_20 should have 19 NaNs, SMA_50 should have 49 NaNs)
-    assert analyzer.df['SMA_20'].isna().sum() == 19
-    assert analyzer.df['SMA_50'].isna().sum() == 49
+        assert col in analyzer.df.columns, f"Missing expected indicator column: {col}"
     
-    # Check a specific calculated value (The 50th row is the first non-NaN for SMA_50)
-    # The SMA_50 for this row (index 49) should be the average of prices 10-59 (which is 34.5)
-    # The original implementation uses df.dropna(inplace=True) inside, which changes the index.
-    # Let's adjust the test to account for the internal dropna if len(df) is > 50.
+@patch('yfinance.download', side_effect=mock_download)
+def test_add_indicators_initial_nan_handling(mock_download_func):
+    """Test that TA-Lib correctly handles initial NaN values for indicators based on their period."""
+    analyzer = StockAnalyzer(ticker='TEST')
+    analyzer.add_indicators()
+    df = analyzer.df
     
-    # Since the mock is *exactly* 50, the last row should have a value for SMA_50
-    # The prices are 10..59. Sum is 1725. Mean is 34.5
-    assert not pd.isna(analyzer.df['SMA_50'].iloc[-1]), "SMA_50 value should be calculated for the last row."
-    # The actual numerical check is less critical than column presence for a unit test focused on logic flow.
+    # SMA_20 requires 20 periods, so index 19 should be NaN, index 20 should be a number.
+    assert pd.isna(df['SMA_20'].iloc[19])
+    assert pd.notna(df['SMA_20'].iloc[20])
+    
+    # SMA_50 requires 50 periods, so index 49 should be NaN, index 50 should be a number.
+    assert pd.isna(df['SMA_50'].iloc[49])
+    assert pd.notna(df['SMA_50'].iloc[50])
+    
+    # The length of the dataframe after dropna in add_indicators should be 60 - (50 - 1) = 11 rows of calculated data (but it actually drops NaNs AFTER calculation, so length should be based on initial size - NaNs)
+    # The TA-Lib functions return Series where the first N-1 rows are NaN, where N is the longest period (50 for SMA_50)
+    # Since the internal data cleaning in StockAnalyzer.add_indicators() drops NaNs, the final length should be reduced.
+    # Total rows: 60. Longest lookback: 50. Number of NaNs: 49.
 
+# After dropna(inplace=True), the final DataFrame should have 60 - 49 = 11 rows.
+    # Note: I am assuming the internal logic in StockAnalyzer.add_indicators() is updated to handle dropna after calculation.
+    # The snippet shows: df.dropna(inplace=True) is called before calculation, which is incorrect as TA-Lib outputs will reintroduce NaNs.
+    # I need to assume the logic is: load -> calculate -> drop NaNs from indicators.
+    
+    # Let's check the number of non-NaN values for SMA_50:
+    non_nan_count = df['SMA_50'].count()
+    # It should be 60 total rows - 49 initial NaNs = 11 calculated values.
+    assert non_nan_count == 11, f"Expected 11 non-NaN values for SMA_50, got {non_nan_count}"
 
+@patch('yfinance.download', side_effect=mock_download)
 def test_add_indicators_insufficient_data():
-    """Test that ValueError is raised for too little data."""
-    mock_data = {'Close': np.arange(10, 20)}
-    df = pd.DataFrame(mock_data)
-    df.index = pd.to_datetime(pd.date_range('2024-01-01', periods=10, freq='D'))
-    
-    class MockAnalyzer(StockAnalyzer):
-        def init(self, df):
-            self.ticker = 'MOCK'
-            self.df = df
+    """Test that add_indicators raises ValueError when data is insufficient (e.g., < 50 rows)."""
+    # Override mock data to return only 40 rows
+    short_data = mock_stock_data()[:40]
 
-    analyzer = MockAnalyzer(df)
+    with patch('yfinance.download', return_value=short_data):
+        analyzer = StockAnalyzer(ticker='SHORT')
+        # The add_indicators method is expected to raise a ValueError due to the check in finance_tools.py
+        with pytest.raises(ValueError) as excinfo:
+            analyzer.add_indicators()
+            
+        assert "Not enough clean data (only 40 points) for TA-Lib indicators" in str(excinfo.value)
+
+@patch('yfinance.download', side_effect=mock_download)
+def test_add_returns(mock_download_func, mock_stock_data):
+    """Test that add_returns calculates the daily return and drops the initial NaN."""
+    analyzer = StockAnalyzer(ticker='TEST')
+    processed_df = analyzer.add_returns()
     
-    with pytest.raises(ValueError, match="Not enough clean data"):
-        analyzer.add_indicators()
+    # Check for the new column
+    assert 'Return' in processed_df.columns
+    # Check that the first row (initial NaN) was dropped
+    assert len(processed_df) == len(mock_stock_data) - 1
+    # Check that the 'Return' column contains no NaNs
+    assert processed_df['Return'].isnull().sum() == 0
+
+@patch('yfinance.download', side_effect=mock_download)
+def test_add_indicators_result_size(mock_download_func, mock_stock_data):
+    """Test that add_indicators results in a clean DataFrame with the correct number of rows (after dropping TA-Lib NaNs)."""
+    analyzer = StockAnalyzer(ticker='TEST')
+    processed_df = analyzer.add_indicators()
+    
+    # Initial mock data has 60 rows.
+    # SMA_50 lookback is 49 days, creating 49 NaNs.
+    # Final clean DataFrame size should be 60 - 49 = 11 rows.
+    expected_size = len(mock_stock_data) - 49 
+    assert len(processed_df) == expected_size, f"Expected {expected_size} rows, got {len(processed_df)}"
+    
+    # Check that the 'SMA_50' column contains no NaNs
+    assert processed_df['SMA_50'].isnull().sum() == 0

@@ -44,45 +44,56 @@ class StockAnalyzer:
         df.dropna(how='all', inplace=True) 
 
         return df
+    
+    def add_returns(self):
+        """Computes the daily percentage change (daily returns)."""
+        if self.df is None or self.df.empty:
+            raise ValueError("DataFrame is empty. Cannot compute returns.")
+        
+        # Calculate daily returns from the 'Close' price
+        self.df['Return'] = self.df['Close'].pct_change()
+        # Drop the first row which will contain NaN after pct_change
+        self.df.dropna(subset=['Return'], inplace=True)
+        
+        return self.df
 
     def add_indicators(self):
         """
-        Adds technical analysis indicators (SMA, RSI, MACD) to the internal DataFrame (self.df).
+        Computes and adds technical indicators (SMA_20, SMA_50, RSI_14, MACD) 
+        to the internal DataFrame. Drops rows with NaN values resulting from 
+        the indicator lookback periods.
         """
         df = self.df.copy()
         
-        # Coerce 'Close' column to numeric to handle any data errors.
-        df["Close"] = pd.to_numeric(df["Close"], errors='coerce') 
-
-        # Drop any remaining rows with NaNs.
-        df.dropna(inplace=True) 
-
-        # Extract the clean NumPy array for TA-Lib, explicitly cast as float64.
+        # We only use 'Close' for TA-Lib, but converting only once is clean
         close_prices = df["Close"].values.astype(np.float64)
         
         # Check for sufficient data length (SMA_50 is the longest period used)
         if len(close_prices) < 50:
             raise ValueError(
-                f"Not enough clean data (only {len(close_prices)} points) for TA-Lib indicators (SMA_50 requires at least 50)."
+                f"Not enough data (only {len(close_prices)} points) for TA-Lib indicators (SMA_50 requires at least 50)."
             )
 
-        # ----------------------------------------------------
-        # 1. Simple Moving Average (SMA) - Tracks average price
-        # ----------------------------------------------------
+        # 1. Simple Moving Average (SMA)
         df["SMA_20"] = ta.SMA(close_prices, timeperiod=20)
         df["SMA_50"] = ta.SMA(close_prices, timeperiod=50)
 
-        # 2. Relative Strength Index (RSI) - Measures speed and change of price movements
+        # 2. Relative Strength Index (RSI)
         df["RSI_14"] = ta.RSI(close_prices, timeperiod=14)
 
         # 3. Moving Average Convergence Divergence (MACD)
-        # MACD: 12-period EMA - 26-period EMA
         macd, macdsignal, macdhist = ta.MACD(
             close_prices, fastperiod=12, slowperiod=26, signalperiod=9
         )
         df["MACD"] = macd
         df["MACD_Signal"] = macdsignal
+        df["MACD_Hist"] = macdhist
         
-        # Update the internal DataFrame
-        self.df = df.dropna()
+        # List of all new indicator columns
+        indicator_cols = ['SMA_20', 'SMA_50', 'RSI_14', 'MACD', 'MACD_Signal', 'MACD_Hist']
+        
+        # FIX: Drop only the rows where the new indicator columns have NaNs (due to lookback)
+        # This keeps the original data intact if possible, but ensures the calculated indicators are clean.
+        self.df = df.dropna(subset=indicator_cols).copy()
+
         return self.df
