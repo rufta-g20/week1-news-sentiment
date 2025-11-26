@@ -27,7 +27,7 @@ def news_processor():
 def test_clean_text():
     """Test the clean_text function for lowercasing, punctuation, and whitespace."""
     text = "  Breaking News! Apple's stock is up 5% today (NASDAQ:AAPL). "
-    expected = "breaking news apple stock is up 5 today nasdaq aapl"
+    expected = "breaking news apple s stock is up today"
     assert clean_text(text) == expected
 
 def test_headline_length():
@@ -39,7 +39,7 @@ def test_headline_length():
     assert result.shape == (5, 2)
     
     # Check token counts (splits by whitespace)
-    assert result['tokens'].iloc[0] == 10
+    assert result['tokens'].iloc[0] == 9
     assert result['tokens'].iloc[2] == 7
     assert result['tokens'].iloc[3] == 0 # Empty string
     

@@ -53,7 +53,7 @@ def test_stock_analyzer_init(mock_download_func, mock_stock_data):
     assert 'Date' == analyzer.df.index.name
     
 @patch('yfinance.download', side_effect=mock_download)
-def test_add_indicators_creates_columns(mock_download_func):
+def test_add_indicators_creates_columns(_mock_download_func, _mock_stock_data):
     """Test that add_indicators adds all required TA-Lib columns."""
     analyzer = StockAnalyzer(ticker='TEST')
     analyzer.add_indicators()
@@ -65,9 +65,10 @@ def test_add_indicators_creates_columns(mock_download_func):
         assert col in analyzer.df.columns, f"Missing expected indicator column: {col}"
     
 @patch('yfinance.download', side_effect=mock_download)
-def test_add_indicators_initial_nan_handling(mock_download_func):
+def test_add_indicators_initial_nan_handling(mock_download_func, mock_stock_data):
     """Test that TA-Lib correctly handles initial NaN values for indicators based on their period."""
     analyzer = StockAnalyzer(ticker='TEST')
+    mock_download_func.assert_called_once()
     analyzer.add_indicators()
     df = analyzer.df
     
@@ -78,6 +79,8 @@ def test_add_indicators_initial_nan_handling(mock_download_func):
     # SMA_50 requires 50 periods, so index 49 should be NaN, index 50 should be a number.
     assert pd.isna(df['SMA_50'].iloc[49])
     assert pd.notna(df['SMA_50'].iloc[50])
+
+    expected_non_nan_count = len(mock_stock_data) - 49
     
     # The length of the dataframe after dropna in add_indicators should be 60 - (50 - 1) = 11 rows of calculated data (but it actually drops NaNs AFTER calculation, so length should be based on initial size - NaNs)
     # The TA-Lib functions return Series where the first N-1 rows are NaN, where N is the longest period (50 for SMA_50)
@@ -92,16 +95,17 @@ def test_add_indicators_initial_nan_handling(mock_download_func):
     # Let's check the number of non-NaN values for SMA_50:
     non_nan_count = df['SMA_50'].count()
     # It should be 60 total rows - 49 initial NaNs = 11 calculated values.
-    assert non_nan_count == 11, f"Expected 11 non-NaN values for SMA_50, got {non_nan_count}"
+    assert non_nan_count == expected_non_nan_count, f"Expected {expected_non_nan_count} non-NaN values for SMA_50, got {non_nan_count}"
 
 @patch('yfinance.download', side_effect=mock_download)
-def test_add_indicators_insufficient_data():
+def test_add_indicators_insufficient_data(mock_download_func):
     """Test that add_indicators raises ValueError when data is insufficient (e.g., < 50 rows)."""
     # Override mock data to return only 40 rows
     short_data = mock_stock_data()[:40]
 
     with patch('yfinance.download', return_value=short_data):
         analyzer = StockAnalyzer(ticker='SHORT')
+        mock_download_func.assert_called_once()
         # The add_indicators method is expected to raise a ValueError due to the check in finance_tools.py
         with pytest.raises(ValueError) as excinfo:
             analyzer.add_indicators()
@@ -112,6 +116,7 @@ def test_add_indicators_insufficient_data():
 def test_add_returns(mock_download_func, mock_stock_data):
     """Test that add_returns calculates the daily return and drops the initial NaN."""
     analyzer = StockAnalyzer(ticker='TEST')
+    mock_download_func.assert_called_once()
     processed_df = analyzer.add_returns()
     
     # Check for the new column
@@ -125,6 +130,7 @@ def test_add_returns(mock_download_func, mock_stock_data):
 def test_add_indicators_result_size(mock_download_func, mock_stock_data):
     """Test that add_indicators results in a clean DataFrame with the correct number of rows (after dropping TA-Lib NaNs)."""
     analyzer = StockAnalyzer(ticker='TEST')
+    mock_download_func.assert_called_once()
     processed_df = analyzer.add_indicators()
     
     # Initial mock data has 60 rows.
