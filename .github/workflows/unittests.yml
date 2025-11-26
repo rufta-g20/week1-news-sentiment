@@ -9,10 +9,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    strategy:
-      # Testing against multiple Python versions
-      matrix:
-        python-version: ["3.10", "3.11", "3.12"] 
         
     steps:
       - name: Checkout repository
