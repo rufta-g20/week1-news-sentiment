@@ -46,16 +46,23 @@ class StockAnalyzer:
         return df
     
     def add_returns(self):
-        """Computes the daily percentage change (daily returns)."""
-        if self.df is None or self.df.empty:
-            raise ValueError("DataFrame is empty. Cannot compute returns.")
-        
-        # Calculate daily returns from the 'Close' price
-        self.df['Return'] = self.df['Close'].pct_change()
-        # Drop the first row which will contain NaN after pct_change
-        self.df.dropna(subset=['Return'], inplace=True)
-        
-        return self.df
+       """
+        Calculates the daily percentage return and drops the initial NaN row.
+        Updates self.df internally and returns the updated DataFrame.
+      """
+       # Create a copy to perform calculations on
+       df = self.df.copy() 
+    
+       # Calculate daily returns
+       df['Return'] = df['Close'].pct_change()
+    
+       # Drop the first row which will contain NaN after pct_change
+       df.dropna(subset=['Return'], inplace=True)
+       
+       # CRITICAL FIX: Update the internal DataFrame
+       self.df = df
+       
+       return self.df # Return the updated DataFrame
 
     def add_indicators(self):
         """

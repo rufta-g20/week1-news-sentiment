@@ -205,12 +205,12 @@ class NewsCorpusProcessor:
     def calculate_sentiment(self) -> pd.DataFrame:
         """
         Calculates sentiment scores (Compound, Pos, Neu, Neg) for all texts
-        in the corpus using VADER (Valence Aware Dictionary and sEntiment Reasoner).
+        in the corpus using VADER.
 
         Returns
         -------
         pd.DataFrame
-            DataFrame with 'vader_compound', 'vader_pos', 'vader_neu', 'vader_neg' columns.
+            DataFrame with 'vader_compound', 'vader_pos', 'vader_neg', 'vader_neu' columns.
         """
         if self.texts is None:
             raise ValueError("Text corpus (self.texts) is empty.")
@@ -225,7 +225,8 @@ class NewsCorpusProcessor:
         # Convert list of dictionaries into a DataFrame
         sentiment_df = pd.DataFrame(sentiment_results)
         
-        # Rename columns to be descriptive for the final DataFrame
+        # Rename and reorder columns
         sentiment_df.columns = ['vader_neg', 'vader_neu', 'vader_pos', 'vader_compound']
+        sentiment_df = sentiment_df[['vader_compound', 'vader_pos', 'vader_neg', 'vader_neu']]
         
         return sentiment_df
